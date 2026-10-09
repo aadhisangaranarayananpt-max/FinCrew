@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: fincrew
+    env: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/state
