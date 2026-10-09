@@ -27,6 +27,12 @@
 
   const LANGUAGE_MAP = { en: "en-US", hi: "hi-IN", es: "es-ES" };
   const DEFAULT_VOICE_ENABLED = false;
+  let voiceRecognition = null;
+  let voiceListeningEnabled = false;
+  let voiceAwaitingQuestion = false;
+  let voiceSpeaking = false;
+  let voiceRestartTimer = null;
+  let voiceFollowupTimer = null;
 
   function showGuideMessage(key, fallback = "") {
     const message = CRUES_MESSAGES[key] || fallback;
@@ -42,17 +48,21 @@
     const select = document.getElementById("cruesLangSelect");
     const button = document.getElementById("cruesVoiceToggle");
     const language = localStorage.getItem("fincrew-language") || "en";
-    const enabled = localStorage.getItem("fincrew-voice-enabled") === "true";
     if (select) {
       select.value = Object.prototype.hasOwnProperty.call(LANGUAGE_MAP, language) ? language : "en";
     }
     if (button) {
-      button.textContent = enabled ? "Voice on" : "Voice off";
-      button.setAttribute("aria-pressed", String(enabled));
-      button.classList.toggle("is-on", enabled);
+      button.textContent = voiceListeningEnabled ? "Crews listening" : "Call Crews";
+      button.setAttribute("aria-pressed", String(voiceListeningEnabled));
+      button.classList.toggle("is-on", voiceListeningEnabled);
+    }
+    const mic = document.getElementById("mic-button");
+    if (mic) {
+      mic.textContent = voiceListeningEnabled ? "■ STOP LISTENING" : "🎙 START HANDS-FREE";
+      mic.setAttribute("aria-pressed", String(voiceListeningEnabled));
+      mic.classList.toggle("on", voiceListeningEnabled);
     }
     document.documentElement.lang = language;
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
   }
   const suggested = [
     "How is my business doing?",
@@ -120,7 +130,6 @@
   }
   let selectedWhatIf = "spend";
   let toastTimer;
-  let voiceRecognition = null;
   let chatHistory = readHistory();
 
   function readHistory() {
@@ -579,7 +588,7 @@
         <section class="chat"><div class="chat-head"><div><h2>Ask CRUES anything</h2><p>Answers use the latest simulated business numbers.</p></div></div><div class="msgs" id="messages" aria-live="polite">${transcript || `<div class="msg fc">Hi, I’m CRUES. I’m watching ${esc(businessName)}’s numbers and can help you decide what to do next.</div>`}</div>
           <div class="chips">${suggested.map((question) => `<button class="chip" data-ask="${esc(question)}">${esc(question)}</button>`).join("")}</div>
           <form class="composer" id="chat-form"><label class="sr-only" for="chat-input">Ask CRUES a question</label><input id="chat-input" maxlength="500" placeholder="Ask about cash, risks, or a decision…" autocomplete="off" required><button class="btn primary">Send</button></form>
-          <div class="voice"><button class="mic" id="mic-button" type="button">🎙 TALK TO CRUES</button><span class="vstate" id="voice-state" aria-live="polite">Tap to speak</span><span class="muted voice-help" id="voice-help">Voice input works in supported browsers. Your microphone is only used after you tap.</span></div>
+          <div class="voice"><button class="mic" id="mic-button" type="button" aria-pressed="false">🎙 START HANDS-FREE</button><span class="vstate" id="voice-state" aria-live="polite">Tap Call Crews once, then say “Crews” followed by your question.</span><span class="muted voice-help" id="voice-help">Listening stays on while you review the business. Say “Crews” before each question; stop listening when you are done.</span></div>
         </section></div>`;
   }
 
@@ -604,6 +613,7 @@
       simulation: game
     };
     root.innerHTML = shell(views[page](s), page, titles[page]);
+    updateVoiceControls();
     const messageList = document.getElementById("messages");
     if (messageList) messageList.scrollTop = messageList.scrollHeight;
   }
@@ -674,7 +684,7 @@
     showModal(`<span class="mtag">FINCREW’S REASONING</span><h3>Why this recommendation?</h3><p>${esc(ev.recommendation)}</p><ol>${ev.why.map((item) => `<li>${esc(item)}</li>`).join("")}</ol><p class="muted">This is a recommendation, not an automatic action. You remain in control.</p>`);
   }
 
-  async function submitChat(question) {
+  async function submitChat(question, { spoken = false } = {}) {
     const input = document.getElementById("chat-input");
     const q = (question || (input && input.value) || "").trim();
     if (!q) return;
@@ -683,19 +693,21 @@
     render(state);
     chatHistory.push({ role: "assistant", text: "Thinking…", source: "local", pending: true });
     render(state);
+    if (spoken) voiceState("Checking your business…", "");
     try {
       const answer = await request("/api/chat", { message: q, simple: simpleMode() });
       chatHistory.pop();
       chatHistory.push({ role: "assistant", text: answer.text, source: answer.source });
       saveHistory();
       render(state);
-      speakIfRequested(answer.text);
+      speakIfRequested(answer.text, { spoken });
     } catch (error) {
       chatHistory.pop();
       chatHistory.push({ role: "assistant", text: error.message, source: "local" });
       saveHistory();
       render(state);
       setBanner(error.message, "error");
+      if (spoken) speakIfRequested(error.message, { spoken: true });
     }
   }
 
@@ -711,109 +723,199 @@
       indicator.textContent = label;
       indicator.className = "vstate" + (mode ? ` ${mode}` : "");
     }
-    if (mic) mic.classList.toggle("on", mode === "live");
+    if (mic) mic.classList.toggle("on", voiceListeningEnabled);
   }
 
-  function speakIfRequested(text) {
-    const enabled = localStorage.getItem("fincrew-voice-enabled") === "true";
-    if (!enabled) return;
+  function speakIfRequested(text, { spoken = false, awaitingQuestion = false } = {}) {
+    const enabled = spoken || localStorage.getItem("fincrew-voice-enabled") === "true";
+    if (!enabled) {
+      voiceSpeaking = false;
+      resumeVoiceListening();
+      return;
+    }
     if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
-      voiceState("Response ready · speech playback unavailable", "warn");
+      voiceSpeaking = false;
+      if (awaitingQuestion && voiceListeningEnabled) {
+        voiceState("I’m listening. Ask your question now.", "live");
+        startVoiceFollowupTimeout();
+      } else {
+        voiceState("Spoken replies are not supported. Listening for “Crews” remains on.", "warn");
+      }
+      resumeVoiceListening();
       return;
     }
     const safeText = String(text || "").replace(/\*\*/g, "").trim();
-    if (!safeText) return;
-    voiceState("Speaking...", "");
+    if (!safeText) {
+      voiceSpeaking = false;
+      resumeVoiceListening();
+      return;
+    }
+    if (voiceListeningEnabled) {
+      voiceSpeaking = true;
+      suspendVoiceRecognition();
+    }
+    voiceState("Crews is speaking…", "");
     const utterance = new SpeechSynthesisUtterance(safeText);
     utterance.lang = currentVoiceLanguage();
-    utterance.onend = () => voiceState("Tap to speak", "");
-    utterance.onerror = () => voiceState("Response ready · speech playback unavailable", "warn");
+    const finishSpeaking = () => {
+      voiceSpeaking = false;
+      if (voiceListeningEnabled) {
+        if (awaitingQuestion && voiceAwaitingQuestion) {
+          voiceState("I’m listening. Ask your question now.", "live");
+          startVoiceFollowupTimeout();
+        } else {
+          voiceState("Listening for “Crews”. Say the wake word and your question.", "live");
+        }
+        resumeVoiceListening();
+      } else {
+        voiceState("Voice is off. Tap Call Crews to start hands-free listening.", "");
+      }
+    };
+    utterance.onend = finishSpeaking;
+    utterance.onerror = finishSpeaking;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
   }
 
   function beginVoice() {
-    const enabled = localStorage.getItem("fincrew-voice-enabled") === "true";
-    if (!enabled) {
-      localStorage.setItem("fincrew-voice-enabled", "true");
-      updateVoiceControls();
-      showToast("Voice enabled. Speak to CRUES when ready.");
+    if (voiceListeningEnabled) {
+      stopVoiceListening();
+      return;
     }
-
     const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname) || window.location.hostname.startsWith("192.168.") || window.location.hostname.startsWith("10.") || window.location.hostname.startsWith("172.");
     if (!window.isSecureContext && !isLocalHost) {
-      voiceState("Voice requires a trusted local browser session. Open this app from localhost or a secure local network connection.", "warn");
-      showToast("Voice recognition is usually limited to localhost or secure local network access. Please use a supported browser on the same network.");
+      voiceState("Voice requires HTTPS or localhost. Open FinCrew in a supported browser over a secure connection.", "warn");
       return;
     }
 
     const Recognition = getSpeechRecognitionClass();
     if (!Recognition) {
       voiceState("Voice input is not supported here. Type your question instead.", "warn");
-      showToast("Voice input is not supported in this browser. Please type your message instead.");
       return;
     }
-    if (voiceRecognition) {
-      voiceRecognition.stop();
-      voiceRecognition = null;
-      voiceState("Tap to speak", "");
-      return;
-    }
+    voiceListeningEnabled = true;
+    voiceAwaitingQuestion = false;
+    localStorage.setItem("fincrew-voice-enabled", "true");
+    updateVoiceControls();
+    voiceState("Starting hands-free voice… allow microphone access, then say “Crews”.", "");
+    startVoiceRecognition(Recognition);
+    showToast("Hands-free voice is on. Say “Crews” followed by your question.");
+  }
 
-    const requestVoiceAccess = () => {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ audio: true }).then(() => {
-          startSpeechRecognition();
-        }).catch(() => {
-          voiceState("Microphone permission is blocked. Allow access to use voice chat.", "warn");
-          showToast("Allow microphone permission in your browser, then tap the mic again.");
-        });
-        return;
-      }
-      startSpeechRecognition();
-    };
-
-    const startSpeechRecognition = () => {
-      try {
-        voiceRecognition = new Recognition();
-        voiceRecognition.lang = currentVoiceLanguage();
-        voiceRecognition.interimResults = false;
-        voiceRecognition.maxAlternatives = 1;
-        voiceRecognition.continuous = false;
-        voiceRecognition.onstart = () => voiceState("Listening...", "live");
-        voiceRecognition.onerror = (event) => {
-          voiceRecognition = null;
-          const text = event && event.error === "not-allowed"
-            ? "Microphone permission was not granted. Please allow access and try again."
-            : "I couldn't hear that. Please try again or type your question.";
-          voiceState(text, "warn");
-        };
-        voiceRecognition.onresult = (event) => {
-          const heard = Array.from(event.results)
-            .map((result) => (result && result[0] ? result[0].transcript : ""))
-            .join(" ")
-            .trim();
-          if (!heard) {
-            voiceState("Tap to speak", "");
+  function startVoiceRecognition(Recognition = getSpeechRecognitionClass()) {
+    if (!voiceListeningEnabled || voiceRecognition || voiceSpeaking || !Recognition) return;
+    clearTimeout(voiceRestartTimer);
+    try {
+      const recognition = new Recognition();
+      voiceRecognition = recognition;
+      recognition.lang = currentVoiceLanguage();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 3;
+      recognition.onstart = () => {
+        if (voiceRecognition === recognition && voiceListeningEnabled) {
+          voiceState(voiceAwaitingQuestion ? "I’m listening. Ask your question now." : "Listening for “Crews”. Say the wake word and your question.", "live");
+        }
+      };
+      recognition.onresult = (event) => {
+        if (!voiceListeningEnabled || voiceSpeaking) return;
+        for (let index = event.resultIndex; index < event.results.length; index += 1) {
+          const result = event.results[index];
+          if (!result.isFinal) continue;
+          const alternatives = Array.from(result, (alternative) => alternative.transcript?.trim()).filter(Boolean);
+          const wakePattern = /^\s*(?:(?:hey|okay)\s+)?(?:crews?|crues?|cruz|cruises?|crew'?s?|cruse)(?:\s+ai)?\b/i;
+          const transcript = alternatives.find((item) => wakePattern.test(item)) || alternatives[0];
+          if (!transcript) continue;
+          const wakeMatch = transcript.match(/^\s*(?:(?:hey|okay)\s+)?(?:crews?|crues?|cruz|cruises?|crew'?s?|cruse)(?:\s+ai)?\b[\s,.:;!?-]*/i);
+          if (wakeMatch) {
+            const question = transcript.slice(wakeMatch[0].length).trim();
+            clearTimeout(voiceFollowupTimer);
+            if (question) {
+              submitVoiceQuestion(question);
+              return;
+            } else {
+              voiceAwaitingQuestion = true;
+              speakIfRequested("Yes, I’m here. What would you like help with?", { spoken: true, awaitingQuestion: true });
+              return;
+            }
+          } else if (voiceAwaitingQuestion) {
+            submitVoiceQuestion(transcript);
             return;
           }
-          voiceState("Thinking...", "");
-          submitChat(heard);
+        }
+      };
+      recognition.onerror = (event) => {
+        const messages = {
+          "not-allowed": "Microphone access is blocked. Allow microphone access, then tap Call Crews again.",
+          "service-not-allowed": "Voice recognition is unavailable. Use HTTPS or localhost, or type your question.",
+          "audio-capture": "No microphone was found. Connect or enable a microphone, then try again.",
+          network: "Voice recognition needs an internet connection. Check your connection and try again.",
+          "no-speech": "I’m still listening. Say “Crews” when you’re ready.",
+          aborted: ""
         };
-        voiceRecognition.onend = () => {
-          voiceRecognition = null;
-          const indicator = document.getElementById("voice-state");
-          if (indicator && indicator.textContent === "Listening...") voiceState("Tap to speak", "");
-        };
-        voiceRecognition.start();
-      } catch (_) {
-        voiceRecognition = null;
-        voiceState("Couldn't start the microphone. Check browser permissions.", "warn");
-        showToast("Microphone access was blocked. Please allow permission and try again.");
-      }
-    };
+        if (event.error !== "aborted") voiceState(messages[event.error] || "Voice input failed. Check your microphone or type your question.", "warn");
+        if (["not-allowed", "service-not-allowed", "audio-capture", "network"].includes(event.error)) {
+          stopVoiceListening(false);
+        }
+      };
+      recognition.onend = () => {
+        if (voiceRecognition === recognition) voiceRecognition = null;
+        if (voiceListeningEnabled && !voiceSpeaking) resumeVoiceListening();
+      };
+      recognition.start();
+    } catch (error) {
+      voiceRecognition = null;
+      voiceState(error?.name === "NotAllowedError"
+        ? "Microphone permission is blocked. Allow it in browser settings, then tap Call Crews again."
+        : "Could not start the microphone. Check that it is enabled and not in use by another app.", "warn");
+      stopVoiceListening(false);
+    }
+  }
 
-    requestVoiceAccess();
+  function submitVoiceQuestion(question) {
+    voiceAwaitingQuestion = false;
+    clearTimeout(voiceFollowupTimer);
+    voiceSpeaking = true;
+    suspendVoiceRecognition();
+    voiceState("Checking your business…", "");
+    submitChat(question, { spoken: true });
+  }
+
+  function startVoiceFollowupTimeout() {
+    clearTimeout(voiceFollowupTimer);
+    voiceFollowupTimer = window.setTimeout(() => {
+      voiceAwaitingQuestion = false;
+      if (voiceListeningEnabled && !voiceSpeaking) voiceState("I didn’t hear a question. Say “Crews” to try again.", "live");
+    }, 12000);
+  }
+
+  function suspendVoiceRecognition() {
+    clearTimeout(voiceRestartTimer);
+    if (voiceRecognition) {
+      const recognition = voiceRecognition;
+      voiceRecognition = null;
+      recognition.abort();
+    }
+  }
+
+  function resumeVoiceListening() {
+    if (voiceListeningEnabled && !voiceRecognition && !voiceSpeaking) {
+      clearTimeout(voiceRestartTimer);
+      voiceRestartTimer = window.setTimeout(() => startVoiceRecognition(), 350);
+    }
+  }
+
+  function stopVoiceListening(updateStatus = true) {
+    voiceListeningEnabled = false;
+    voiceAwaitingQuestion = false;
+    voiceSpeaking = false;
+    clearTimeout(voiceRestartTimer);
+    clearTimeout(voiceFollowupTimer);
+    suspendVoiceRecognition();
+    localStorage.setItem("fincrew-voice-enabled", "false");
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    updateVoiceControls();
+    if (updateStatus) voiceState("Voice is off. Tap Call Crews to start hands-free listening.", "");
   }
 
   async function runWhatIf(button) {
@@ -866,17 +968,7 @@
       return;
     }
     if (button.matches("[data-close-modal]")) return closeModal();
-    if (button.matches("#cruesVoiceToggle")) {
-      const isEnabled = localStorage.getItem("fincrew-voice-enabled") === "true";
-      localStorage.setItem("fincrew-voice-enabled", String(!isEnabled));
-      updateVoiceControls();
-      if (!isEnabled) {
-        showToast("Voice enabled. CRUES can speak answers back to you.");
-      } else {
-        showToast("Voice disabled.");
-      }
-      return;
-    }
+    if (button.matches("#cruesVoiceToggle")) return beginVoice();
     if (button.matches("[data-sim-start]")) return mutate("/api/sim/start", {}, "Simulation started.");
     if (button.matches("[data-sim-next]")) return mutate("/api/sim/next", {}, "Next event detected.");
     if (button.matches("[data-sim-reset]")) return mutate("/api/sim/reset", {}, "Simulation reset.");

@@ -489,6 +489,11 @@ body {
   color: var(--fincrew-blue);
   border-color: rgba(36, 87, 245, 0.25);
 }
+.cta-button.crew-button.voice-active {
+  background: rgba(15, 157, 88, 0.1);
+  color: #087a43;
+  border-color: rgba(15, 157, 88, 0.32);
+}
 .crew-panel {
   position: absolute;
   z-index: 10;

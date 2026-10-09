@@ -51,7 +51,7 @@ export class HomeUi {
               <li data-quest-step="order"><span>05</span><small>GROW</small></li>
             </ol>
             <strong id="game-objective" class="game-objective">Drive smart. Protect your cash.</strong>
-            <p id="game-instruction" class="game-instruction">Collect gold cash tokens, dodge expense crates, and steer with ← → or A / D.</p>
+            <p id="game-instruction" class="game-instruction">Collect gold cash tokens, dodge expense crates, steer with ← → or A / D, and press Space to start or pause.</p>
             <div class="game-panel-foot">
               <span>MISSION XP</span>
               <strong id="mission-xp">0</strong>
@@ -97,7 +97,7 @@ export class HomeUi {
               <button id="crew-close-btn" class="crew-close" type="button" aria-label="Close Crews AI">×</button>
             </div>
             <div id="crew-messages" class="crew-messages" aria-live="polite">
-              <p class="crew-message assistant">Hi, I’m Crews AI. When the microphone says it’s on, say “Crews” followed by your question. You can also type below.</p>
+              <p class="crew-message assistant">Tap CALL CREWS AI once to start hands-free voice. When the microphone is on, say “Crews” followed by your question, or say “Crews” and wait for my reply. You don’t need to press the microphone for each question. Listening stays on while you play or review your business until you stop it.</p>
             </div>
             <form id="crew-form" class="crew-form">
               <label class="sr-only" for="crew-input">Ask Crews AI a question</label>
@@ -105,8 +105,8 @@ export class HomeUi {
               <button class="crew-send" type="submit">SEND</button>
             </form>
             <div class="crew-voice-row">
-              <button id="crew-mic-btn" class="crew-mic" type="button" aria-pressed="false">🎙 SAY “CREWS”</button>
-              <span id="crew-voice-status" aria-live="polite">Tap CALL CREWS AI to turn on the microphone, then say “Crews”.</span>
+              <button id="crew-mic-btn" class="crew-mic" type="button" aria-pressed="false">🎙 START HANDS-FREE VOICE</button>
+              <span id="crew-voice-status" aria-live="polite">Tap CALL CREWS AI once to start hands-free listening. Say “Crews” to ask a question. Listening stays on until you stop it.</span>
             </div>
             <a class="crew-full-link" href="FinCrew.html">Open full Crews AI Copilot</a>
           </aside>
@@ -161,7 +161,7 @@ export class HomeUi {
     this.statusBanner = document.getElementById('status-banner');
   }
 
-  bind({ onStart, onNext, onOpen2D, onAct, onWhy, onCrewQuestion, onCrewVoice, onCrewStop, onCrewVoiceQuestion, onDriveStart, onDriveLeft, onDriveRight, onDrivePause, onDriveSound }) {
+  bind({ onStart, onNext, onOpen2D, onAct, onWhy, onCrewQuestion, onCrewVoice, onCrewVoiceToggle, onCrewVoiceQuestion, onDriveStart, onDriveLeft, onDriveRight, onDrivePause, onDriveSound }) {
     document.getElementById('start-sim-btn').addEventListener('click', onStart);
     document.getElementById('next-event-btn').addEventListener('click', onNext);
     document.getElementById('two-d-btn').addEventListener('click', onOpen2D);
@@ -174,12 +174,10 @@ export class HomeUi {
       if (this.crewPanel.classList.contains('hidden')) {
         this.openCrew(onCrewVoice);
       } else {
-        onCrewStop?.();
         this.closeCrew();
       }
     });
     document.getElementById('crew-close-btn').addEventListener('click', () => {
-      onCrewStop?.();
       this.closeCrew();
     });
     document.getElementById('crew-form').addEventListener('submit', (event) => {
@@ -190,7 +188,7 @@ export class HomeUi {
         onCrewQuestion(message);
       }
     });
-    document.getElementById('crew-mic-btn').addEventListener('click', () => onCrewVoice?.());
+    document.getElementById('crew-mic-btn').addEventListener('click', () => onCrewVoiceToggle?.());
     this.onCrewVoiceQuestion = onCrewVoiceQuestion;
 
     this.onAct = onAct;
@@ -202,7 +200,6 @@ export class HomeUi {
     this.crewPanel.classList.remove('hidden');
     document.querySelector('.fincrew-3d-shell')?.classList.add('crew-open');
     document.getElementById('copilot-btn').setAttribute('aria-expanded', 'true');
-    this.crewInput.focus();
     onCrewVoice?.();
   }
 
@@ -228,7 +225,11 @@ export class HomeUi {
   setCrewVoiceActive(active) {
     const button = document.getElementById('crew-mic-btn');
     button.setAttribute('aria-pressed', String(active));
-    button.textContent = active ? '■ STOP LISTENING' : '🎙 START VOICE';
+    button.textContent = active ? '■ STOP LISTENING' : '🎙 START HANDS-FREE VOICE';
+    const callButton = document.getElementById('copilot-btn');
+    callButton.classList.toggle('voice-active', active);
+    callButton.textContent = active ? 'CREWS AI · LISTENING' : 'CALL CREWS AI';
+    callButton.setAttribute('aria-label', active ? 'Open Crews AI panel; hands-free voice is listening' : 'Call Crews AI and start hands-free voice');
   }
 
   updateDrive(drive) {

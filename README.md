@@ -37,7 +37,7 @@ Then visit [http://localhost:5000](http://localhost:5000). On macOS or Linux, cr
 
 ## 3D home page
 
-The home page is **Cashflow Racer**, a light-theme 3D driving game built with Vite + Three.js. Steer between three lanes with the arrow keys or A/D (or use the on-screen controls on touch screens), collect gold cash tokens, and avoid expense crates to protect your cash shield. Original Web Audio engine, cash pickup, and collision sounds play after the player starts the engine; use the speaker control to mute or restore them. The five connected financial missions, owner-approved decisions, Crews AI chat, and browser voice controls remain available in the game HUD; the classic 2D dashboard is still accessible.
+The home page is **Cashflow Racer**, a light-theme 3D driving game built with Vite + Three.js. Press **Space** to start or pause, and steer between three lanes with **← / →** or **A / D** (or use the on-screen controls on touch screens). Collect gold cash tokens and avoid expense crates to protect your cash shield. Original Web Audio engine, cash pickup, and collision sounds play after the player starts the engine; use the speaker control to mute or restore them. The five connected financial missions, owner-approved decisions, Crews AI chat, and browser voice controls remain available in the game HUD; the classic 2D dashboard is still accessible.
 
 ### Requirements
 
@@ -109,7 +109,7 @@ Each mission updates the simulated business, financial health, and activity log.
 
 ## Voice assistant
 
-On the 3D home page, tap **CALL CREWS AI**, allow microphone access, and wait until the status says the microphone is on. Say **“Crews”** followed by your question, or say **“Crews”**, listen for Crews AI’s spoken acknowledgement, then ask when the panel says it is listening. Crews AI answers aloud and resumes listening for the wake word. Voice recognition depends on browser support and a secure context; use `localhost` or HTTPS with a supported browser such as current Chrome or Edge. The panel explains microphone, connection, and browser errors, and the text box remains available if voice is unavailable. The full classic copilot remains at [http://localhost:5000/FinCrew.html](http://localhost:5000/FinCrew.html).
+On the 3D home page, tap **CALL CREWS AI once** and allow microphone access. After the status says the microphone is on, say **“Crews”** followed by your question, or say **“Crews”**, listen for the spoken acknowledgement, then ask when Crews AI says it is listening. Crews AI answers aloud and keeps listening for the wake word while you play or review the business; you do not need to press the microphone button for each question. Closing the chat panel does not turn off listening. Reopen it and press **STOP LISTENING** when you want the microphone off. On the classic business dashboard, use the **Call Crews** control in the top bar once to start the same hands-free wake-word flow; it remains available while you review dashboard sections, and the **Crews listening** control turns it off. Browser microphone permission and speech recognition support are required; use `localhost` or HTTPS with a supported browser such as current Chrome or Edge. Voice recognition may stop when the browser or page is suspended. Voice controls report microphone, connection, and browser errors; text chat remains available if voice is unavailable.
 
 ## Project architecture
 

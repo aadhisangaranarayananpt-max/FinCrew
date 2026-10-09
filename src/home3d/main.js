@@ -458,7 +458,8 @@ function toggleDrivePause() {
 }
 
 function onDriveKeyDown(event) {
-  if (event.target instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'BUTTON'].includes(event.target.tagName)) {
+  if (event.target instanceof HTMLElement
+    && (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName))) {
     return;
   }
   if (['ArrowLeft', 'a', 'A'].includes(event.key)) {
@@ -625,8 +626,8 @@ function attachActions() {
     },
     onCrewQuestion: (question) => handleCrewQuestion(question),
     onCrewVoiceQuestion: (question) => handleCrewQuestion(question, true),
-    onCrewVoice: toggleCrewVoice,
-    onCrewStop: stopCrewVoice,
+    onCrewVoice: startCrewVoice,
+    onCrewVoiceToggle: toggleCrewVoice,
     onAct: async (actionId) => {
       try {
         const result = await approveAction(actionId);
@@ -715,7 +716,7 @@ function speakCrewAnswer(text, { awaitingQuestion = false } = {}) {
       ui.setCrewVoiceStatus('Microphone is on. Say “Crews” to ask another question.');
       resumeCrewListening();
     } else {
-      ui.setCrewVoiceStatus('Tap CALL CREWS AI to turn on the microphone, then say “Crews”.');
+      ui.setCrewVoiceStatus('Voice is off. Tap CALL CREWS AI once to start hands-free listening.');
     }
   };
   utterance.onerror = () => {
@@ -815,7 +816,7 @@ function startCrewVoice() {
       'service-not-allowed': 'Voice recognition is unavailable for this site. Use HTTPS or localhost, allow microphone access, or type your question.',
       'audio-capture': 'No microphone was found. Connect or enable a microphone, then try again.',
       network: 'Voice recognition needs an internet connection in this browser. You can still type to Crews AI.',
-      'no-speech': 'I’m ready, but didn’t hear speech. Say “Crews” clearly or tap the microphone to retry.',
+      'no-speech': 'I’m still listening. Say “Crews” when you’re ready.',
       aborted: 'Voice listening stopped.'
     };
     if (event.error !== 'aborted') {
@@ -885,7 +886,7 @@ function stopCrewVoice() {
     window.speechSynthesis.cancel();
   }
   ui.setCrewVoiceActive(false);
-  ui.setCrewVoiceStatus('Tap CALL CREWS AI to turn on the microphone, then say “Crews”.');
+  ui.setCrewVoiceStatus('Voice is off. Tap CALL CREWS AI once to start hands-free listening.');
 }
 
 function boot() {
