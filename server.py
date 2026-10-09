@@ -570,6 +570,11 @@ def home():
     return send_from_directory(BASE, "index.html")
 
 
+@app.get("/index.html")
+def home_index():
+    return home()
+
+
 @app.get("/assets/<path:filename>")
 def dist_assets(filename):
     dist_dir = os.path.join(BASE, "dist", "assets")
@@ -580,7 +585,7 @@ def dist_assets(filename):
 
 @app.get("/legacy-dashboard.html")
 def legacy_dashboard():
-    return send_from_directory(BASE, "index.html")
+    return send_from_directory(BASE, "legacy-dashboard.html")
 
 
 @app.get("/<path:p>")

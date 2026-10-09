@@ -17,6 +17,13 @@ export async function fetchState() {
   return apiFetch('/api/state');
 }
 
+export async function askCrew(message) {
+  return apiFetch('/api/chat', {
+    method: 'POST',
+    body: JSON.stringify({ message, simple: true })
+  });
+}
+
 export async function startSimulation() {
   return apiFetch('/api/sim/start', { method: 'POST' });
 }

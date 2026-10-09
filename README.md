@@ -37,7 +37,7 @@ Then visit [http://localhost:5000](http://localhost:5000). On macOS or Linux, cr
 
 ## 3D home page
 
-The project also includes a lightweight 3D home experience built with Vite + Three.js. It runs alongside the existing Flask pages and provides a richer business campus view while keeping the classic 2D dashboard available.
+The home page is **Cashflow Racer**, a light-theme 3D driving game built with Vite + Three.js. Steer between three lanes with the arrow keys or A/D (or use the on-screen controls on touch screens), collect gold cash tokens, and avoid expense crates to protect your cash shield. Original Web Audio engine, cash pickup, and collision sounds play after the player starts the engine; use the speaker control to mute or restore them. The five connected financial missions, owner-approved decisions, Crews AI chat, and browser voice controls remain available in the game HUD; the classic 2D dashboard is still accessible.
 
 ### Requirements
 
@@ -81,7 +81,7 @@ The hosted demo uses in-memory simulation state: restarting or redeploying reset
 
 ## Starting the backend
 
-`server.py` serves the frontend and provides the JSON API on `127.0.0.1:5000` by default. Set `PORT` in the environment to choose another port. The in-memory business state resets when the server restarts; the AI conversation history is saved locally in the browser.
+`server.py` serves the frontend and provides the JSON API on `0.0.0.0:5000` by default, so other devices on the same network can reach it if the computer's firewall allows the connection. Set `PORT` in the environment to choose another port. For access from anywhere, publish the app using the Render steps above and use its HTTPS URL. The in-memory business state resets when the server restarts; the AI conversation history is saved locally in the browser.
 
 ## Optional AI API setup
 
@@ -95,9 +95,9 @@ An optional Anthropic API key enables external AI-generated answers:
 
 The key is read only by the Python backend and must never be placed in browser files. If the API is unavailable or the key is missing, FinCrew continues to use local reasoning.
 
-## Game-A-Thon mode
+## Cashflow Rescue campaign
 
-Open the **Simulation** page from the dashboard, or visit [http://localhost:5000/fincrew-game.html](http://localhost:5000/fincrew-game.html). Press **START SIMULATION** to run the five events for AriaCraft Supplies:
+Start the finance rescue run from the 3D home page. The five-sector campaign puts the player in charge of responding to:
 
 1. ₹85,000 late customer payment
 2. ₹1,20,000 unexpected expense
@@ -105,15 +105,15 @@ Open the **Simulation** page from the dashboard, or visit [http://localhost:5000
 4. ₹95,000 obligation due in five days
 5. ₹3,00,000 growth opportunity
 
-Each event updates business state, health, and the activity log. Use **WHY?** to inspect the recommendation. Before an important action is recorded, FinCrew asks for explicit owner approval. The What-if tool estimates scenarios without changing the business.
+Each mission updates the simulated business, financial health, and activity log. The mission map, sector progress, and Mission XP update as events are resolved. Use **WHY?** to inspect a recommendation. Before an important action is recorded, FinCrew asks for explicit owner approval. The What-if tool estimates scenarios without changing the business. The driving game is a separate arcade run and does not perform financial actions. The previous simulation page remains available for compatibility.
 
 ## Voice assistant
 
-Open **FinCrew AI** or [http://localhost:5000/FinCrew.html](http://localhost:5000/FinCrew.html). Tap **TALK TO FINCREW**, grant microphone permission, and ask a question. Speech recognition depends on browser support and may require a secure context; `localhost` is supported in current Chrome and Edge. If speech recognition is unavailable or permission is denied, use the text chat. Speech synthesis is used when the browser supports it.
+On the 3D home page, tap **CALL CREWS AI**, allow microphone access, and wait until the status says the microphone is on. Say **“Crews”** followed by your question, or say **“Crews”**, listen for Crews AI’s spoken acknowledgement, then ask when the panel says it is listening. Crews AI answers aloud and resumes listening for the wake word. Voice recognition depends on browser support and a secure context; use `localhost` or HTTPS with a supported browser such as current Chrome or Edge. The panel explains microphone, connection, and browser errors, and the text box remains available if voice is unavailable. The full classic copilot remains at [http://localhost:5000/FinCrew.html](http://localhost:5000/FinCrew.html).
 
 ## Project architecture
 
-- `index.html`, `FinCrew.html`, and `fincrew-game.html` load the shared vanilla JavaScript application for the dashboard, assistant, and judge-focused simulation.
+- `index.html` loads the built 3D Cashflow Racer game; `FinCrew.html` and `fincrew-game.html` preserve the classic copilot and simulation pages.
 - `app.js` renders the pages, calls the backend API, manages chat and speech, and requires confirmation before actions.
 - `style.css` provides the responsive, light fintech interface.
 - `server.py` owns business state, event detection, financial calculations, deterministic reasoning, optional API requests, approvals, and audit logging.
@@ -123,4 +123,4 @@ Open **FinCrew AI** or [http://localhost:5000/FinCrew.html](http://localhost:500
 
 1. Dashboard: show health, cash, priorities, and the business context.
 2. FinCrew AI: ask a question, enable Simple Mode, and try voice where available.
-3. Simulation: start the event sequence, inspect **WHY?**, approve or cancel actions, run a What-if, and finish with the activity log.
+3. Cashflow Rescue: start the five-sector run, orbit the campus, inspect **WHY?**, approve or cancel decisions, and review the result in the Activity Log.
