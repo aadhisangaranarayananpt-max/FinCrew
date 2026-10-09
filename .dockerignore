@@ -3,6 +3,7 @@ __pycache__
 .vscode
 .git
 .gitignore
+.env
 *.pyc
 *.pyo
 *.pyd
